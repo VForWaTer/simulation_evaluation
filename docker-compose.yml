@@ -1,0 +1,7 @@
+services:
+  dev:
+    build: .
+    volumes:
+      - ./in:/in
+      - ./out:/out
+      - ./src:/src

@@ -1,0 +1,42 @@
+# This CITATION.cff file was generated with cffinit.
+# Visit https://bit.ly/cffinit to generate yours today!
+
+cff-version: 1.0.0
+title: Simulation evaluation tool
+message: >-
+  Please replace this citation information with appropriate
+  metadata for your tool
+type: software
+authors:
+  - given-names: Mirko
+    family-names: Mälicke
+    email: mirko.maelicke@KIT.edu
+    affiliation: >-
+      Institute for Water and Environment, Hydrology,
+      Karlsruhe Institute for Technology (KIT)
+    orcid: 'https://orcid.org/0000-0002-0424-2651'
+  - given-names: Balazs
+    family-names: Bischof
+    email: balazs.bischof@kit.edu
+    affiliation: >-
+      Institute for Water and Environment, Hydrology,
+      Karlsruhe Institute for Technology (KIT) 
+    orcid: 'https://orcid.org/0000-0002-0424-2651'
+repository-code: 'https://github.com/VForWaTer/simulation_evaluation'
+url: 'https://vforwater.github.io/tool-specs/'
+abstract: >-
+  This is a Github repository template for scientific data
+  (pre-)processing tools following the tool specs
+  (https://vforwater.github.io/tool-specs/) for
+  containerized scientific tools. You can use this
+  repository as a starting point for scientific tools.
+keywords:
+  - docker
+  - tool-spec
+  - V-For-WaTer
+  - discharge
+  - LSTM
+  - evaluation
+license: CC-BY-4.0
+version: '0.1'
+date-released: '2025-02-25'

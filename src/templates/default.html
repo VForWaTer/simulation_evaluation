@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Catchment Analysis</title>
+</head>
+<body>
+    <h1>Hydrological Catchment Analysis</h1>
+    <label for="catchment-select">Select Catchment:</label>
+    <select id="catchment-select" onchange="updateContent()">
+        <option value="">--Select--</option>
+        {% for name in data_names %}
+            <option value="{{name}}">{{name}}</option>
+        {% endfor %}
+    </select>
+    <div id="catchment-content"></div>
+
+    <script>
+        const catchmentPlots = {{json_plots}};
+        const catchmentTables = {{json_tables}};
+        const catchmentMetrics = {{json_metrics}};
+
+        function updateContent() {
+            const catchment = document.getElementById("catchment-select").value;
+            const contentDiv = document.getElementById("catchment-content");
+
+            if (catchment) {
+                const metricsTable = catchmentTables[catchment];
+
+                contentDiv.innerHTML = `
+                    <h3>Time Series Plot for ${catchment}</h3>
+                    <img src="data:image/png;base64,${catchmentPlots[catchment]}" alt="Time Series Plot">
+                    <h3>Metrics for ${catchment}</h3>
+                    ${metricsTable}
+                `;
+            } else {
+                contentDiv.innerHTML = '';
+            }
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,47 @@
+tools:
+  simulation_evaluation:
+    title: Simulation Evaluation (single)
+    description: A tool designed for processing hydrological data from multiple catchments, calculating key performance metrics and generating visualizations.
+  
+    parameters:
+      index_column:
+        type: string
+        default: date
+        description: | 
+          If the observations and simulations are indexed with a timestamp, you
+          may identify the correct column to use here.
+      observation_column:
+        type: string
+        default: obs
+        description: | 
+         bla
+      simulation_column:
+        type: string
+        optional: true
+        description: |
+          Specify the column containing the simulated data. If no column is listed,
+          then the tool will use **all** columns that are not index or observation columns.
+    data:
+      simulation_data:
+        extension:
+          - csv
+          - parquet
+        description: | 
+          Directory where the input data files are stored. The directory should contain
+          all the catchment files (including observation and simlation data columns). 
+          Each column will be interpreted as an observation or simulation realization, while different 
+          files are interpreted as different simulation or simulation scenarios. You may use wildcards to 
+          point to more than one input file.
+        example: /in/DE110000.csv
+      observation_data:
+        extension:
+          - csv
+          - parquet
+        description: | 
+          Directory where the input data files are stored. The directory should contain
+          all the catchment files (including observation and simlation data columns). 
+          Each column will be interpreted as an observation or simulation realization, while different 
+          files are interpreted as different simulation or simulation scenarios. You may use wildcards to 
+          point to more than one input file.
+        example: /in/DE110000.csv
+
