@@ -7,8 +7,8 @@ from json2args import get_parameter
 from json2args.data import get_data_paths
 from json2args.logger import logger
 
-from evaluation import process_all, load_data
-from outputs import create_output_resources, build_report
+from evaluation import process_data_and_metrics, load_data
+from outputs import create_output_resources_compressed, create_metrics_output, build_report
 
 # parse parameters with correct section
 kwargs = get_parameter(section="simulation_evaluation", typed=True)
@@ -41,18 +41,32 @@ if toolname == 'simulation_evaluation':
     logger.debug(f"Loaded {len(data)} datasets in the {sim_data_dir} folder after {t2 - start:.2f} seconds: [{', '.join(data_names)}]")
 
     # Process data
-    #catchment_plots, catchment_tables, catchment_metrics = process_all(data)
-    catchment_plots, catchment_metrics = process_all(data, index_column=kwargs.index_column, observation_column=kwargs.observation_column, simulation_column=kwargs.simulation_column)
-    
+    catchment_metrics, catchment_datasets = process_data_and_metrics(
+        data,
+        index_column=kwargs.index_column,
+        observation_column=kwargs.observation_column,
+        simulation_column=kwargs.simulation_column
+    )
     
     t3 = time()
     logger.debug(f"Processed datasets in {t3 - t2:.2f} seconds")
     
+    # Create metrics output files
+    create_metrics_output(data_names, catchment_metrics)
+    t3a = time()
+    logger.debug(f"Created metrics output in {t3a - t3:.2f} seconds")
 
-    # Create output
-    create_output_resources(data_names, catchment_plots, catchment_metrics)
+    # Create output resources with compressed datasets
+    create_output_resources_compressed(
+        data_names,
+        catchment_datasets,
+        catchment_metrics,
+        kwargs.index_column,
+        kwargs.observation_column,
+        kwargs.simulation_column
+    )
     t4 = time()
-    logger.debug(f"Created output resources in {t4 - t3:.2f} seconds")
+    logger.debug(f"Created output resources in {t4 - t3a:.2f} seconds")
     
     
     build_report()

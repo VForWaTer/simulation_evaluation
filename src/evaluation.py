@@ -1,15 +1,8 @@
 import pandas as pd
 import numpy as np
-import seaborn as sns
-import matplotlib.pyplot as plt
 from sklearn.metrics import mean_squared_error, r2_score
 from scipy.stats import pearsonr
-import base64
-import json
-from io import BytesIO
 from pathlib import Path
-import plotly.express as px
-import plotly.io as pio, json
 
 
 
@@ -72,86 +65,42 @@ def load_data(simulation_path: Path,
 
     return data
 
-def generate_matplotlib_plot(catchment, df, index_column, observation_column, simulation_column):
-    plt.figure(figsize=(10, 6))
-    sns.lineplot(data=df, x=index_column, y=observation_column, label='Observed')
-    sns.lineplot(data=df, x=index_column, y=simulation_column, label='Simulated', linestyle='--')
-    plt.title(f'Time Series - {catchment}')
-    plt.xlabel('Date')
-    plt.ylabel('Discharge Volume')
-    plt.legend()
-    plt.xticks(rotation=45)
+def process_data_and_metrics(
+    data: dict[str, pd.DataFrame], 
+    index_column: str,
+    observation_column: str,
+    simulation_column: str,
+    # Future parameters for downsampling/extent cutting will be added here
+    # max_points: int | None = None,
+    # date_range: tuple[str, str] | None = None,
+) -> tuple[dict[str, dict], dict[str, pd.DataFrame]]:
+    """
+    Process catchment data to calculate metrics and prepare datasets for visualization.
     
-    buf = BytesIO()
-    plt.savefig(buf, format='png')
-    buf.seek(0)
-    img_base64 = base64.b64encode(buf.read()).decode('utf-8')
-    plt.close()
-    return img_base64
-
-#def generate_plotly_plot(catchment, df, index_column, observation_column, simulation_column):
-#    fig = px.line(df, x=index_column, y=[observation_column, simulation_column], title=f'Time Series - {catchment}')
-#    fig.update_xaxes(tickangle=45)
-#    fig.update_layout(legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
-    
-#    fig_json = json.loads(fig.to_json())
-#    return fig_json
-
-
-def _downsample(df, max_points=1000):
-    n = len(df)
-    if n <= max_points:
-        return df
-    step = max(1, n // max_points)
-    return df.iloc[::step].copy()
-
-def generate_plotly_plot(catchment, df, index_column, observation_column, simulation_column, max_points=1000):
-    df_plot = _downsample(df[[index_column, observation_column, simulation_column]], max_points=max_points)
-    fig = px.line(
-        df_plot,
-        x=index_column,
-        y=[observation_column, simulation_column],
-        title=f'Time Series - {catchment}',
-        render_mode="webgl",
-    )
-    fig.update_xaxes(tickangle=45)
-    fig.update_layout(legend=dict(orientation="h", y=1.02, x=1, yanchor="bottom", xanchor="right"))
-    return fig.to_plotly_json()   
-
-def generate_metrics_table(metrics):
-    table_html = '<table class="table table-bordered table-striped">'
-    table_html += '<thead><tr><th>Metric</th><th>Value</th></tr></thead><tbody>'
-    for metric, value in metrics.items():
-        table_html += f'<tr><td>{metric}</td><td>{value:.4f}</td></tr>'
-    table_html += '</tbody></table>'
-    return table_html
-
-def process_all(data: dict[str, pd.DataFrame], index_column, observation_column, simulation_column):
-    results = []
-    catchment_plots = {}
-    #catchment_tables = {}
+    This function separates data processing from plot generation, allowing for
+    future flexibility in downsampling, date range filtering, or other data transformations.
+    """
     catchment_metrics = {}
+    catchment_datasets = {}
     
     for name, df in data.items():
-        df.dropna(subset=[observation_column, simulation_column], inplace=True)
-        observed = df[observation_column]
-        simulated = df[simulation_column]
+        # Create a copy to avoid modifying original data
+        df_processed = df.copy()
         
+        # Remove rows with missing values in key columns
+        df_processed.dropna(subset=[observation_column, simulation_column], inplace=True)
+        
+        # Extract series for metric calculation
+        observed = df_processed[observation_column]
+        simulated = df_processed[simulation_column]
+        
+        # Calculate metrics
         metrics = calculate_metrics(observed, simulated)
-        results.append({'Catchment': name, **metrics})
-        
-        #plot_base64 = generate_matplotlib_plot(name, df, observation_column=observation_column, simulation_column=simulation_column)
-        #metrics_table_html = generate_metrics_table(metrics)
-        plot_json = generate_plotly_plot(name, df, index_column, observation_column=observation_column, simulation_column=simulation_column, max_points=1000)
-        catchment_plots[name] = plot_json
-        #catchment_plots[name] = plot_base64
-        #catchment_tables[name] = metrics_table_html
         catchment_metrics[name] = metrics
+        
+        # Store processed dataset (will be used for plot generation later)
+        # Future: Apply downsampling/extent cutting here before storing
+        catchment_datasets[name] = df_processed
     
-    results_df = pd.DataFrame(results)
-    results_df.to_csv("/out/metrics_summary.csv", index=False)
-    results_df.to_json("/out/metrics_summary.json", orient="records", indent=4)
-    
-    #return catchment_plots, catchment_tables, catchment_metrics
-    return catchment_plots, catchment_metrics
+    return catchment_metrics, catchment_datasets
 

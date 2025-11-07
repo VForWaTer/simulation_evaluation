@@ -2,120 +2,148 @@ from pathlib import Path
 import json
 import subprocess
 import shutil
-from json2args.logger import logger
-import re
-from jinja2 import FileSystemLoader, Environment
-from plotly.utils import PlotlyJSONEncoder
 
-def create_output_resources(data_names, catchment_plots, catchment_metrics):
-    logger.info("#Tcreate output ressources - simulation evaluation")
+from json2args.logger import logger
+import gzip
+import base64
+from typing import Dict, Any
+import pandas as pd
+
+def compress_dataset(datasets: Dict[str, Any], index_column: str, observation_column: str, simulation_column: str) -> str:
+    """
+    Compress catchment datasets for embedding in HTML.
+    
+    This function prepares the dataset dictionary for compression and embedding.
+    The datasets are converted to a JSON-serializable format, then compressed using gzip,
+    and finally base64-encoded for safe embedding in JavaScript.
+    
+    Returns:
+        Base64-encoded, gzip-compressed string of the dataset JSON
+    
+    Example structure of datasets dict before compression:
+        {
+            "DE110000": {
+                "index": ["2020-01-01", "2020-01-02", ...],
+                "observation": [1.2, 1.5, ...],
+                "simulation": [1.3, 1.4, ...]
+            },
+            ...
+        }
+    """
+    json_payload = {}
+
+    for name, df in datasets.items():
+        index = df[index_column]
+        observation = df[observation_column].tolist()
+        simulation = df[simulation_column].tolist()
+
+        if pd.api.types.is_datetime64_any_dtype(index):
+            index = index.dt.strftime('%Y-%m-%d %H:%M:%S').tolist()
+        else:
+            index = index.tolist()
+
+        json_payload[name] = {
+            "index": index,
+            "observation": observation,
+            "simulation": simulation
+        }
+    
+    # convert to compact JSON string
+    json_string = json.dumps(json_payload, separators=(',', ':'))
+    compressed = gzip.compress(json_string.encode('utf-8'))
+
+    # base64 encoding
+    compressed_string = base64.b64encode(compressed).decode('utf-8')
+    return compressed_string
+
+
+def create_metrics_output(data_names: list[str], catchment_metrics: Dict[str, Dict[str, float]]) -> None:
+    """
+    Create metrics output files (CSV and JSON).
+    
+    This function generates the metrics summary files that are written to /out.
+    It's separated from plot generation to allow independent execution.
+    
+    Args:
+        data_names: List of catchment names
+        catchment_metrics: Dictionary mapping catchment names to metric dictionaries
+    """
+    results = []
+    for name in data_names:
+        if name in catchment_metrics:
+            results.append({'Catchment': name, **catchment_metrics[name]})
+    
+    results_df = pd.DataFrame(results)
+    results_df.to_csv("/out/metrics_summary.csv", index=False)
+    results_df.to_json("/out/metrics_summary.json", orient="records", indent=4)
+    
+    logger.info(f"Created metrics output files for {len(results)} catchments")
+
+
+def create_output_resources_compressed(
+    data_names: list[str],
+    catchment_datasets: Dict[str, pd.DataFrame],
+    catchment_metrics: Dict[str, Dict[str, float]],
+    index_column: str,
+    observation_column: str,
+    simulation_column: str
+) -> None:
+    """
+    Create output resources with compressed dataset embedding.
+    
+    This function generates the JavaScript modules needed for the Svelte report,
+    including the compressed dataset data that will be embedded in the HTML.
+    
+    Args:
+        data_names: List of catchment names
+        catchment_datasets: Dictionary mapping catchment names to DataFrames
+        catchment_metrics: Dictionary mapping catchment names to metric dictionaries
+        index_column: Name of the datetime index column
+        observation_column: Name of the observation data column
+        simulation_column: Name of the simulation data column
+    """
+    logger.info("#Tcreate output ressources - simulation evaluation (compressed)")
     report_root = Path("report")
-    static_plots = report_root / "static" / "plots"     
-    lib_dir      = report_root / "src" / "lib"
-    static_plots.mkdir(parents=True, exist_ok=True)
+    lib_dir = report_root / "src" / "lib"
     lib_dir.mkdir(parents=True, exist_ok=True)
 
-    def safe(name: str) -> str:
-        return re.sub(r'[^A-Za-z0-9._-]+', '_', name)
+    # 1) Compress the dataset
+    compressed_data = compress_dataset(
+        catchment_datasets,
+        index_column,
+        observation_column,
+        simulation_column
+    )
+    
+    # 2) Create the compressed dataset module
+    # This will contain the base64-encoded, gzip-compressed dataset
+    (lib_dir / "dataset_compressed.js").write_text(
+        f"export const datasetCompressed = '{compressed_data}';\n",
+        encoding="utf-8"
+    )
 
-    # 1) Write each plot as a JSON file under report/static/plots
-    index = {}
-    for name, plot in catchment_plots.items():
-        fn = f"{safe(name)}.json"
-        (static_plots / fn).write_text(
-            json.dumps(plot, cls=PlotlyJSONEncoder, separators=(',', ':')),
-            encoding="utf-8"
-        )
-        # This URL will be valid in both dev & prod builds
-        index[name] = f"/plots/{fn}"
-
-    # 2) move metrics to static if large; otherwise keep as JS
-    # Here we keep metrics small in JS:
+    # 3) Create metrics and names module (unchanged)
     (lib_dir / "report_data.js").write_text(
         "export const names = " + json.dumps(data_names, ensure_ascii=False, separators=(',', ':')) + ";\n"
         "export const metrics = " + json.dumps(catchment_metrics, ensure_ascii=False, separators=(',', ':')) + ";\n",
         encoding="utf-8"
     )
 
-    # 3) A tiny index mapping catchment -> json URL
-    (lib_dir / "plot_index.js").write_text(
-        "export const plotIndex = " + json.dumps(index, ensure_ascii=False, separators=(',', ':')) + ";\n",
-        encoding="utf-8"
-    )
-
-    # 4) Library barrel
+    # 4) Create config module
     (lib_dir / "config.js").write_text(
         'export const config = { title: "Simulation Evaluation Report" };\n',
         encoding="utf-8"
     )
+
+    # 5) Update library barrel to export compressed dataset
     (lib_dir / "index.ts").write_text(
         "export { names, metrics } from './report_data.js';\n"
-        "export { plotIndex } from './plot_index.js';\n"
+        "export { datasetCompressed } from './dataset_compressed.js';\n"
         "export { config } from './config.js';\n",
         encoding="utf-8"
     )
-    logger.info("#Tcreate output ressources - End")
-
-def create_output_resources_old(data_names, catchment_plots, catchment_metrics):
-    logger.info("#Tcreate output ressources - simulation evaluation")
-
-    try:
     
-        report_src = Path('.') / "report" / "src"
-        report_lib = report_src / "lib"
-        logger.info("Done 1")
-
-        
-        # Create lib directory if it doesn't exist
-        report_lib.mkdir(parents=True, exist_ok=True)
-
-        plots_path = report_lib / "plot_data.js"
-        with open(plots_path, "w", encoding="utf-8") as f:
-            f.write("export const plots = {")
-            first = True
-            for name, plot in catchment_plots.items():
-                if not first:
-                    f.write(",")
-                first = False
-                # key
-                json.dump(name, f, ensure_ascii=False)
-                f.write(":")
-                # value (compact JSON for size/speed)
-                json.dump(plot, f, ensure_ascii=False, separators=(',', ':'))
-                # optional: flush periodically for huge outputs
-                # f.flush()
-            f.write("};")
-
-
-        # Create plot_data.js
-        #with open(report_lib / "plot_data.js", "w") as f:
-        #    logger.info("befor")
-        #    f.write(f"export const plots = {json.dumps(catchment_plots, indent=4)}")
-        #    logger.info("fter")
-        logger.info("Done 2")
-
-        (report_lib / "report_data.js").write_text(
-        "export const metrics = " +
-        json.dumps(catchment_metrics, ensure_ascii=False, separators=(',', ':')) +
-        ";\n\nexport const names = " +
-        json.dumps(data_names, ensure_ascii=False, separators=(',', ':')) +
-        ";\n",
-        encoding="utf-8"
-        )
-
-        (report_lib / "config.js").write_text(
-            'export const config = {\n  title: "Simulation Evaluation Report"\n};\n',
-            encoding="utf-8"
-        )
-        (report_lib / "index.ts").write_text(
-            "export { plots } from './plot_data.js';\n"
-            "export { metrics, names } from './report_data.js';\n"
-            "export { config } from './config.js';\n",
-            encoding="utf-8"
-        )
-        logger.info("Done 5")
-    except Exception as e:
-        logger.info(str(e))
+    logger.info("#Tcreate output ressources - End")
 
 
 def build_report():
@@ -128,25 +156,5 @@ def build_report():
         subprocess.run(["npm", "run", "build"], cwd=report_src)
 
         shutil.copy(report_src / "build" / "index.html", "/out/simulation_report.html")
-    except Exception as e:
-        logger.info(str(e))
-
-
-
-def create_output(data_names, catchment_plots, catchment_tables, catchment_metrics):
-    logger.info("create output - simulation evaluation")
-    try:
-        templateLoader = FileSystemLoader('./templates')
-        env = Environment(loader=templateLoader)
-        
-        json_plots = json.dumps(catchment_plots)
-        json_tables = json.dumps(catchment_tables)
-        json_metrics = json.dumps(catchment_metrics)
-        
-        template = env.get_template('default.html')
-        html_content = template.render(data_names=data_names, json_plots=json_plots, json_tables=json_tables, json_metrics=json_metrics)
-        
-        with open("/out/output.html", "w") as f:
-            f.write(html_content)
     except Exception as e:
         logger.info(str(e))
