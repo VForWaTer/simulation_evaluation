@@ -1,0 +1,22 @@
+node_modules
+.DS_Store
+out/*
+**/__pycache__/*
+*.pyc
+*.pyo
+*.pyd
+*.pyw
+*.pyz
+*.pywz
+*.pyzw
+*.pyzwz
+*.pyzwzw
+*.pyzwzwz
+
+
+# ignore the files which are build in-place
+config.js
+index.ts
+plot_index.js
+report_data.js
+dataset_compressed.js
