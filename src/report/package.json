@@ -38,6 +38,7 @@
 		"@sveltejs/package": "^2.0.0",
 		"@sveltejs/vite-plugin-svelte": "^5.0.0",
 		"@tailwindcss/vite": "^4.0.0",
+		"@types/pako": "^2.0.4",
 		"browser-sync": "^2.29.3",
 		"del": "^7.1.0",
 		"gulp": "^4.0.2",
@@ -52,5 +53,7 @@
 		"svelte"
 	],
 	"dependencies": {
+		"pako": "^2.1.0",
+		"plotly.js": "^3.2.0"
 	}
 }
