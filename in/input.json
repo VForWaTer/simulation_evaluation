@@ -6,8 +6,8 @@
             "simulation_column": "discharge_spec_sim_lstm"
         },
         "data": {
-            "simulation_data": "/in/CAMELS_DE_discharge_sim_DE*.csv",
-            "observation_data": "/in/CAMELS_DE_discharge_sim_DE*.csv"  
+            "simulation_data": "/in/discharge_*.csv",
+            "observation_data": "/in/discharge_*.csv"  
         }
     }
 }
