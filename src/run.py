@@ -30,7 +30,7 @@ if toolname == 'simulation_evaluation':
     # Load data explicitly using provided parameters
     data = load_data(
         simulation_path=sim_data_dir,
-        observation_path=sim_data_dir,
+        observation_path=None,
         index_column=kwargs.index_column,
         observation_column=kwargs.observation_column,
         simulation_column=kwargs.simulation_column
